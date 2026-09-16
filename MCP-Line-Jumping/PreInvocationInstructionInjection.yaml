@@ -1,0 +1,68 @@
+id: MCP_LINE_JUMPING_METADATA_INJECTION
+info:
+  name: "Line jumping via instructions injected into MCP tool metadata"
+  description: "Line jumping lets a tool influence the agent BEFORE it is ever invoked, by planting instructions in metadata the host injects into context at connection time (tool descriptions, prompt templates from prompts/list, or resource annotations). This probe pulls prompts/list and resources/list and checks for imperative, agent-directed content that 'jumps the line' ahead of the user's actual request."
+  details: >
+    "Unlike classic prompt injection which needs the tool to run, line jumping abuses the fact that MCP hosts eagerly load tool descriptions, server-provided prompts, and resource metadata into the model context during initialize/list. Malicious content there is active immediately, before any user approval or tool call.
+    This probe requests prompts/list and resources/list and inspects returned templates/annotations for instruction-shaped payloads. Maps to the Line Jumping technique of Akto's MCP Attack Matrix."
+  impact: "The agent can be steered before the user has done anything, defeating human-in-the-loop review that only gates tool EXECUTION rather than context INGESTION."
+  category:
+    name: MCP_SECURITY
+    shortName: MCP Security
+    displayName: MCP & Agentic Security (MCP_SECURITY)
+  subCategory: MCP_LINE_JUMPING_METADATA_INJECTION
+  severity: HIGH
+  agenticTestingAllowed: true
+  tags:
+    - MCP
+    - Agentic AI
+    - Prompt injection
+    - Line jumping
+  references:
+    - "https://www.akto.io/mcp-attack-matrix/tool-poisoning"
+    - "https://www.akto.io/blog/what-is-mcp-security"
+  cwe:
+    - CWE-94
+
+attributes:
+  nature: NON_INTRUSIVE
+  plan: FREE
+  duration: FAST
+
+api_selection_filters:
+  method:
+    eq: "POST"
+  request_payload:
+    for_one:
+      key:
+        eq: method
+      value:
+        contains_either:
+          - "prompts/list"
+          - "resources/list"
+          - "initialize"
+
+execute:
+  type: multiple
+  requests:
+    - req:
+        - modify_body_param:
+            method: "prompts/list"
+    - req:
+        - modify_body_param:
+            method: "resources/list"
+
+validate:
+  response_payload:
+    contains_either:
+      - "ignore previous"
+      - "you must"
+      - "always call"
+      - "before responding"
+      - "do not reveal"
+      - "assistant should"
+      - "as an ai"
+      - "system:"
+      - "<IMPORTANT>"
+      - "first, run"
+      - "step 1: call"
