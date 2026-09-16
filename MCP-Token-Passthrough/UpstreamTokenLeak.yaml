@@ -1,0 +1,65 @@
+id: MCP_TOKEN_PASSTHROUGH_UPSTREAM_LEAK
+info:
+  name: "Token passthrough: client-supplied token forwarded/echoed by MCP server"
+  description: "The MCP spec forbids blindly forwarding a token issued for the MCP server on to upstream APIs. A non-compliant server that passes the caller's Authorization token through to third parties - or reflects it in tool output or errors - breaks audience isolation and can leak credentials. This probe supplies a marked token and checks whether it is echoed back or leaked in responses."
+  details: >
+    "Token passthrough violates the MCP authorization requirement that a server must only accept tokens minted for itself (correct audience) and must NOT relay them to downstream services. Vulnerable servers either (a) forward the incoming bearer token to upstream APIs, or (b) leak it in verbose errors, tool results, or logs surfaced to the client.
+    This probe sends a canary bearer token and inspects the response for that token or for signs it was replayed upstream. Maps to the Token Passthrough technique of Akto's MCP Attack Matrix."
+  impact: "Credential leakage and cross-service replay: a token scoped to the MCP server becomes usable against unrelated upstream APIs."
+  category:
+    name: MCP_SECURITY
+    shortName: MCP Security
+    displayName: MCP & Agentic Security (MCP_SECURITY)
+  subCategory: MCP_TOKEN_PASSTHROUGH_UPSTREAM_LEAK
+  severity: HIGH
+  agenticTestingAllowed: true
+  tags:
+    - MCP
+    - Agentic AI
+    - Sensitive data exposure
+    - Token passthrough
+  references:
+    - "https://www.akto.io/blog/what-is-mcp-security"
+    - "https://modelcontextprotocol.io/specification/draft/basic/authorization"
+  cwe:
+    - CWE-200
+    - CWE-522
+
+attributes:
+  nature: INTRUSIVE
+  plan: FREE
+  duration: FAST
+
+api_selection_filters:
+  method:
+    eq: "POST"
+  request_payload:
+    for_one:
+      key:
+        eq: method
+      value:
+        contains_either:
+          - "tools/call"
+          - "tools/list"
+
+execute:
+  type: single
+  requests:
+    - req:
+        - add_header:
+            Authorization: "Bearer AKTO_CANARY_TOKEN_9f3c1a"
+        - modify_body_param:
+            method: "tools/call"
+        - modify_body_param:
+            params:
+              name: "debug_echo"
+              arguments:
+                include_headers: true
+
+validate:
+  response_payload:
+    contains_either:
+      - "AKTO_CANARY_TOKEN_9f3c1a"
+      - "Bearer AKTO_CANARY_TOKEN"
+      - "forwarded to"
+      - "upstream request headers"
