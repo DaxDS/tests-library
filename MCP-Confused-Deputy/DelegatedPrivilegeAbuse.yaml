@@ -1,0 +1,78 @@
+id: MCP_CONFUSED_DEPUTY_PRIVILEGE_ABUSE
+info:
+  name: "Confused deputy: MCP tool executes privileged action on behalf of unauthorised caller"
+  description: "The MCP server holds broad upstream credentials (a service account, an OAuth token) and exposes a tool that acts with those privileges. If the tool does not re-check the END caller's authorisation, any client that can reach the tool inherits the server's privilege. This probe calls a privileged tool without caller-scoped authorisation and checks whether the action still succeeds."
+  details: >
+    "In the confused deputy pattern the MCP server is the deputy: it has legitimate permissions (e.g. admin API key for a SaaS) and is tricked into using them for a party who has none. MCP makes this easy because tool authorisation is frequently modelled at the server-to-upstream boundary, not the client-to-tool boundary.
+    This probe invokes an admin/privileged tool (e.g. delete_user, read_secret, list_all_customers) while presenting only a low-privilege or missing caller identity, and flags success. Maps to the Confused Deputy technique of Akto's MCP Attack Matrix."
+  impact: "Privilege escalation and broken object/function level authorisation across every downstream system the MCP server can reach."
+  category:
+    name: MCP_SECURITY
+    shortName: MCP Security
+    displayName: MCP & Agentic Security (MCP_SECURITY)
+  subCategory: MCP_CONFUSED_DEPUTY_PRIVILEGE_ABUSE
+  severity: CRITICAL
+  agenticTestingAllowed: true
+  tags:
+    - MCP
+    - Agentic AI
+    - Broken authorization
+    - Confused deputy
+  references:
+    - "https://www.akto.io/blog/what-is-mcp-security"
+    - "https://modelcontextprotocol.io/specification"
+  cwe:
+    - CWE-441
+    - CWE-862
+
+attributes:
+  nature: INTRUSIVE
+  plan: FREE
+  duration: FAST
+
+api_selection_filters:
+  method:
+    eq: "POST"
+  request_payload:
+    for_one:
+      key:
+        eq: method
+      value:
+        contains_either:
+          - "tools/call"
+
+execute:
+  type: single
+  requests:
+    - req:
+        - remove_auth_header: true
+        - modify_body_param:
+            method: "tools/call"
+        - modify_body_param:
+            params:
+              name: "admin_action"
+              arguments:
+                operation: "list_all_users"
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_either:
+      - "user_id"
+      - "email"
+      - "role"
+      - "admin"
+      - "\"users\""
+      - "secret"
+      - "api_key"
+      - "deleted"
+    not_contains:
+      - "unauthorized"
+      - "forbidden"
+      - "permission denied"
+      - "not allowed"
+      - "authentication required"
+      - "-32001"
+      - "-32600"
